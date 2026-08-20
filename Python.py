@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Full Real System v9.0
+# Ultimate Lib Editor v10.0 (OFFSET + LENGTH FIX)
 # Developer: @VICKYGAMING0
 
 import telebot
@@ -59,8 +59,74 @@ def increment_processed(user_id):
         db[str(user_id)]["files_processed"] += 1
         save_db(db)
 
-# ===================== 1. LIB EDITOR (REAL) =====================
-def extract_urls_from_binary(file_path):
+# ===================== OFFSET + LENGTH URL EXTRACTOR =====================
+def extract_urls_with_offset(file_path):
+    """Extract URLs with their exact offset and length"""
+    urls_with_offset = []
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        
+        # Find all HTTPS URLs with offset
+        url_pattern = rb'https?://[^\s"\']+'
+        for match in re.finditer(url_pattern, data):
+            url = match.group().decode('utf-8', errors='ignore')
+            offset = match.start()
+            length = match.end() - match.start()
+            urls_with_offset.append({
+                "url": url,
+                "offset": offset,
+                "length": length,
+                "hex": data[offset:offset+length].hex()
+            })
+        
+        return urls_with_offset
+    except:
+        return []
+
+# ===================== URL REPLACE WITH OFFSET + LENGTH =====================
+def replace_url_with_offset(file_path, old_url, new_url):
+    """Replace URL at exact offset with proper length"""
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        
+        # Find old URL with offset
+        url_pattern = old_url.encode('utf-8')
+        offset = data.find(url_pattern)
+        
+        if offset == -1:
+            return False, "URL not found"
+        
+        old_len = len(old_url)
+        new_len = len(new_url)
+        
+        # If new URL is shorter, pad with null bytes
+        if new_len < old_len:
+            new_bytes = new_url.encode('utf-8') + b'\x00' * (old_len - new_len)
+        elif new_len > old_len:
+            # If longer, we need to shift data
+            new_bytes = new_url.encode('utf-8')
+            # But we can only replace if same length or shorter
+            # For longer, we need to rebuild the file
+            return False, "New URL is longer. Use same length or shorter."
+        else:
+            new_bytes = new_url.encode('utf-8')
+        
+        # Replace at exact offset
+        new_data = data[:offset] + new_bytes + data[offset + old_len:]
+        
+        with open(file_path, "wb") as f:
+            f.write(new_data)
+        
+        return True, f"Offset: {offset}, Old Length: {old_len}, New Length: {new_len}"
+    except Exception as e:
+        return False, str(e)
+
+# ===================== DEEP URL SCAN =====================
+def deep_scan_urls(file_path):
+    """Deep scan with offset and length"""
+    urls = []
     try:
         result = subprocess.run(["strings", file_path], capture_output=True, text=True)
         content = result.stdout
@@ -70,23 +136,7 @@ def extract_urls_from_binary(file_path):
     except:
         return []
 
-def replace_url_in_binary(file_path, old_url, new_url):
-    try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-        old_bytes = old_url.encode('utf-8')
-        new_bytes = new_url.encode('utf-8')
-        if len(new_bytes) < len(old_bytes):
-            new_bytes += b'\x00' * (len(old_bytes) - len(new_bytes))
-        elif len(new_bytes) > len(old_bytes):
-            new_bytes = new_bytes[:len(old_bytes)]
-        new_data = data.replace(old_bytes, new_bytes)
-        with open(file_path, "wb") as f:
-            f.write(new_data)
-        return True
-    except:
-        return False
-
+# ===================== REPACK =====================
 def repack_file(input_path, output_path):
     try:
         shutil.copy2(input_path, output_path)
@@ -95,7 +145,14 @@ def repack_file(input_path, output_path):
     except:
         return False
 
-# ===================== 2. ENCRYPT / DECRYPT (REAL AES-256) =====================
+def get_file_hash(file_path):
+    sha = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha.update(chunk)
+    return sha.hexdigest()
+
+# ===================== ENCRYPT / DECRYPT =====================
 def encrypt_data(data, password):
     salt = get_random_bytes(16)
     key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000, dklen=32)
@@ -132,7 +189,7 @@ def decrypt_file(file_path, password):
         f.write(decrypted)
     return dec_path
 
-# ===================== 3. FRIDA PATCH (REAL) =====================
+# ===================== FRIDA PATCH =====================
 def analyze_apk(apk_path):
     try:
         result = subprocess.run(
@@ -168,7 +225,7 @@ def extract_hidden_panel(apk_path):
     except:
         return []
 
-# ===================== 4. BEHAVIOR (REAL FRIDA SCRIPT) =====================
+# ===================== BEHAVIOR =====================
 def generate_frida_script(package_name):
     return f"""
 Java.perform(function() {{
@@ -189,7 +246,7 @@ Java.perform(function() {{
 }});
 """
 
-# ===================== 5. FIX LOGIN (REAL) =====================
+# ===================== FIX LOGIN =====================
 def fix_login_html_error(file_path):
     try:
         with open(file_path, "rb") as f:
@@ -199,9 +256,7 @@ def fix_login_html_error(file_path):
             (b'decode', b'parse'),
             (b'external', b'internal'),
             (b'login', b'auth'),
-            (b'error', b'success'),
-            (b'<html', b'<json'),
-            (b'</html>', b'</json>')
+            (b'error', b'success')
         ]
         for old, new in fixes:
             data = data.replace(old, new)
@@ -211,9 +266,9 @@ def fix_login_html_error(file_path):
     except:
         return False
 
-# ===================== 6. ELITE PROTECTION (REAL 360 STYLE) =====================
+# ===================== ELITE PROTECTION =====================
 def generate_chinese_text(length=50):
-    chinese_chars = ['的', '一', '是', '不', '了', '人', '我', '在', '有', '他', '这', '中', '大', '来', '上', '国', '个', '到', '说', '们', '为', '子', '和', '你', '地', '要', '以', '会', '生', '家', '可', '她', '里', '后', '去', '行', '小', '对', '多', '然', '心', '起', '把', '好', '还', '开', '没', '成', '事', '用']
+    chinese_chars = ['的', '一', '是', '不', '了', '人', '我', '在', '有', '他', '这', '中', '大', '来', '上', '国', '个', '到', '说', '们']
     return ''.join(random.choice(chinese_chars) for _ in range(length))
 
 def generate_random_hex(length=30):
@@ -375,13 +430,13 @@ def protect_apk_elite(apk_path):
         shutil.rmtree(temp_dir)
         return False, str(e)
 
-# ===================== BOT COMMANDS =====================
+# ===================== BOT START =====================
 @bot.message_handler(commands=['start'])
 def start(message):
     add_user(message.chat.id, message.from_user.username)
     markup = types.InlineKeyboardMarkup(row_width=2)
-    btn1 = types.InlineKeyboardButton("🛡️ Elite Protect", callback_data="protect")
-    btn2 = types.InlineKeyboardButton("📤 Lib Editor", callback_data="lib")
+    btn1 = types.InlineKeyboardButton("📤 Lib Editor", callback_data="lib")
+    btn2 = types.InlineKeyboardButton("🛡️ Elite Protect", callback_data="protect")
     btn3 = types.InlineKeyboardButton("🔐 Encrypt", callback_data="encrypt")
     btn4 = types.InlineKeyboardButton("🔓 Decrypt", callback_data="decrypt")
     btn5 = types.InlineKeyboardButton("📱 Frida Patch", callback_data="frida")
@@ -394,11 +449,11 @@ def start(message):
     
     bot.send_message(
         message.chat.id,
-        f"🛡️ **Full Real System v9.0**\n\n"
+        f"🛡️ **Ultimate Lib Editor v10.0**\n\n"
         f"👑 Developer: @{ADMIN_USERNAME}\n\n"
-        f"📌 **All Systems Real:**\n"
+        f"📌 **Features:**\n"
+        f"📤 Lib Editor — Extract & replace URLs with OFFSET + LENGTH\n"
         f"🛡️ Elite Protect — 360 + Chinese + Hide Classes\n"
-        f"📤 Lib Editor — Extract & replace URLs\n"
         f"🔐 Encrypt — Real AES-256\n"
         f"🔓 Decrypt — Real AES-256\n"
         f"📱 Frida Patch — Real APK analyze + patch\n"
@@ -408,10 +463,10 @@ def start(message):
         reply_markup=markup
     )
 
-# ===================== LIB EDITOR =====================
+# ===================== LIB EDITOR (WITH OFFSET + LENGTH) =====================
 @bot.message_handler(commands=['lib'])
 def lib_cmd(message):
-    msg = bot.reply_to(message, "📤 Upload a `.so` / `.dll` / `.apk` file.\n🔹 I'll extract HTTPS links.")
+    msg = bot.reply_to(message, "📤 Upload a `.so` / `.dll` / `.apk` file.\n🔹 I'll extract URLs with OFFSET + LENGTH.")
     bot.register_next_step_handler(msg, lib_upload_step)
 
 def lib_upload_step(message):
@@ -428,7 +483,10 @@ def lib_upload_step(message):
     with open(input_path, "wb") as f:
         f.write(downloaded)
     
-    urls = extract_urls_from_binary(input_path)
+    # Get URLs with offset
+    urls_with_offset = extract_urls_with_offset(input_path)
+    urls = [u["url"] for u in urls_with_offset]
+    
     if not urls:
         bot.reply_to(message, "❌ No HTTPS URLs found.")
         shutil.rmtree(temp_dir)
@@ -438,15 +496,18 @@ def lib_upload_step(message):
         "input_path": input_path,
         "temp_dir": temp_dir,
         "file_name": file_name,
-        "urls": urls
+        "urls": urls,
+        "urls_with_offset": urls_with_offset
     }
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     for i, url in enumerate(urls[:10]):
-        markup.add(types.InlineKeyboardButton(f"🔗 {url[:30]}...", callback_data=f"edit_{i}"))
+        offset = urls_with_offset[i]["offset"]
+        length = urls_with_offset[i]["length"]
+        markup.add(types.InlineKeyboardButton(f"🔗 {url[:25]}... (offset:{offset} len:{length})", callback_data=f"edit_{i}"))
     markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel"))
     
-    url_list = "\n".join([f"`{i+1}. {url}`" for i, url in enumerate(urls[:10])])
+    url_list = "\n".join([f"`{i+1}. {url}`\n   Offset: {urls_with_offset[i]['offset']} | Length: {urls_with_offset[i]['length']}" for i, url in enumerate(urls[:10])])
     bot.reply_to(
         message,
         f"✅ **Found {len(urls)} URLs:**\n\n{url_list}\n\nClick a URL to edit.",
@@ -698,10 +759,10 @@ def handle_elite_protect(message):
 # ===================== CALLBACKS =====================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
-    if call.data == "protect":
-        protect_cmd(call.message)
-    elif call.data == "lib":
+    if call.data == "lib":
         lib_cmd(call.message)
+    elif call.data == "protect":
+        protect_cmd(call.message)
     elif call.data == "encrypt":
         encrypt_cmd(call.message)
     elif call.data == "decrypt":
@@ -714,10 +775,10 @@ def handle_callback(call):
         fixlogin_cmd(call.message)
     elif call.data == "help":
         bot.send_message(call.message.chat.id,
-            "📋 **Commands**\n/protect — Elite protection\n/lib — Lib editor\n/encrypt — Encrypt\n/decrypt — Decrypt\n/frida — Frida patch\n/behavior — Frida script\n/fixlogin — Fix login\n👑 @VICKYGAMING0")
+            "📋 **Commands**\n/lib — Lib editor with offset+length\n/protect — Elite protection\n/encrypt — Encrypt\n/decrypt — Decrypt\n/frida — Frida patch\n/behavior — Frida script\n/fixlogin — Fix login\n👑 @VICKYGAMING0")
     elif call.data == "dev":
         bot.send_message(call.message.chat.id,
-            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 9.0\n🔹 All systems real")
+            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 10.0\n🔹 Features: Offset + Length URL replace")
     elif call.data == "stats":
         db = load_db()
         bot.send_message(call.message.chat.id,
@@ -729,11 +790,13 @@ def handle_callback(call):
             bot.send_message(call.message.chat.id, "❌ Session expired.")
             return
         urls = session.get("urls", [])
+        urls_with_offset = session.get("urls_with_offset", [])
         if idx >= len(urls):
             bot.send_message(call.message.chat.id, "❌ URL not found.")
             return
         old_url = urls[idx]
         session["editing_url"] = old_url
+        session["editing_idx"] = idx
         user_sessions[call.from_user.id] = session
         msg = bot.send_message(call.message.chat.id, f"✏️ Edit URL:\n`{old_url}`\n\nSend new URL:")
         bot.register_next_step_handler(msg, process_url_edit)
@@ -757,7 +820,9 @@ def process_url_edit(message):
         bot.reply_to(message, "❌ Must start with `https://`")
         return
     input_path = session["input_path"]
-    if replace_url_in_binary(input_path, old_url, new_url):
+    
+    success, result = replace_url_with_offset(input_path, old_url, new_url)
+    if success:
         temp_dir = session["temp_dir"]
         file_name = session["file_name"]
         output_path = os.path.join(temp_dir, f"repacked_{file_name}")
@@ -766,16 +831,16 @@ def process_url_edit(message):
             bot.send_document(
                 message.chat.id,
                 f,
-                caption=f"✅ **Repacked!**\n🔹 {old_url} → {new_url}"
+                caption=f"✅ **Repacked!**\n🔹 {old_url} → {new_url}\n🔹 {result}"
             )
         shutil.rmtree(temp_dir)
         user_sessions.pop(user_id, None)
     else:
-        bot.reply_to(message, "❌ Replacement failed.")
+        bot.reply_to(message, f"❌ Replacement failed: {result}")
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
-    print("🛡️ Full Real System v9.0 Started!")
+    print("🛡️ Ultimate Lib Editor v10.0 Started!")
     print(f"👑 Developer: @{ADMIN_USERNAME}")
     while True:
         try:
