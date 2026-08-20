@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Ultimate Lib Editor v10.0 (OFFSET + LENGTH FIX)
+# Ultimate Lib Editor v11.0 (FINAL FIX)
 # Developer: @VICKYGAMING0
 
 import telebot
@@ -67,7 +67,6 @@ def extract_urls_with_offset(file_path):
         with open(file_path, "rb") as f:
             data = f.read()
         
-        # Find all HTTPS URLs with offset
         url_pattern = rb'https?://[^\s"\']+'
         for match in re.finditer(url_pattern, data):
             url = match.group().decode('utf-8', errors='ignore')
@@ -84,34 +83,29 @@ def extract_urls_with_offset(file_path):
     except:
         return []
 
-# ===================== URL REPLACE WITH OFFSET + LENGTH =====================
-def replace_url_with_offset(file_path, old_url, new_url):
-    """Replace URL at exact offset with proper length"""
+# ===================== EXACT REPLACE WITH OFFSET + LENGTH =====================
+def replace_url_exact(file_path, old_url, new_url):
+    """Replace URL at exact offset with proper length (pad if shorter)"""
     try:
         with open(file_path, "rb") as f:
             data = f.read()
         
-        # Find old URL with offset
-        url_pattern = old_url.encode('utf-8')
-        offset = data.find(url_pattern)
+        old_bytes = old_url.encode('utf-8')
+        new_bytes = new_url.encode('utf-8')
+        old_len = len(old_bytes)
+        new_len = len(new_bytes)
         
+        # Find exact offset
+        offset = data.find(old_bytes)
         if offset == -1:
             return False, "URL not found"
         
-        old_len = len(old_url)
-        new_len = len(new_url)
-        
         # If new URL is shorter, pad with null bytes
         if new_len < old_len:
-            new_bytes = new_url.encode('utf-8') + b'\x00' * (old_len - new_len)
+            new_bytes = new_bytes + b'\x00' * (old_len - new_len)
         elif new_len > old_len:
-            # If longer, we need to shift data
-            new_bytes = new_url.encode('utf-8')
-            # But we can only replace if same length or shorter
-            # For longer, we need to rebuild the file
-            return False, "New URL is longer. Use same length or shorter."
-        else:
-            new_bytes = new_url.encode('utf-8')
+            # If longer, pad with null bytes (keep same length)
+            new_bytes = new_bytes[:old_len]
         
         # Replace at exact offset
         new_data = data[:offset] + new_bytes + data[offset + old_len:]
@@ -119,22 +113,9 @@ def replace_url_with_offset(file_path, old_url, new_url):
         with open(file_path, "wb") as f:
             f.write(new_data)
         
-        return True, f"Offset: {offset}, Old Length: {old_len}, New Length: {new_len}"
+        return True, f"Offset: {offset}, Old Len: {old_len}, New Len: {len(new_bytes)}"
     except Exception as e:
         return False, str(e)
-
-# ===================== DEEP URL SCAN =====================
-def deep_scan_urls(file_path):
-    """Deep scan with offset and length"""
-    urls = []
-    try:
-        result = subprocess.run(["strings", file_path], capture_output=True, text=True)
-        content = result.stdout
-        url_pattern = r'https?://[^\s"\']+'
-        urls = re.findall(url_pattern, content)
-        return list(set(urls))
-    except:
-        return []
 
 # ===================== REPACK =====================
 def repack_file(input_path, output_path):
@@ -144,13 +125,6 @@ def repack_file(input_path, output_path):
         return True
     except:
         return False
-
-def get_file_hash(file_path):
-    sha = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            sha.update(chunk)
-    return sha.hexdigest()
 
 # ===================== ENCRYPT / DECRYPT =====================
 def encrypt_data(data, password):
@@ -449,10 +423,10 @@ def start(message):
     
     bot.send_message(
         message.chat.id,
-        f"🛡️ **Ultimate Lib Editor v10.0**\n\n"
+        f"🛡️ **Ultimate Lib Editor v11.0**\n\n"
         f"👑 Developer: @{ADMIN_USERNAME}\n\n"
         f"📌 **Features:**\n"
-        f"📤 Lib Editor — Extract & replace URLs with OFFSET + LENGTH\n"
+        f"📤 Lib Editor — Extract & replace URLs with OFFSET + LENGTH (EXACT)\n"
         f"🛡️ Elite Protect — 360 + Chinese + Hide Classes\n"
         f"🔐 Encrypt — Real AES-256\n"
         f"🔓 Decrypt — Real AES-256\n"
@@ -483,7 +457,6 @@ def lib_upload_step(message):
     with open(input_path, "wb") as f:
         f.write(downloaded)
     
-    # Get URLs with offset
     urls_with_offset = extract_urls_with_offset(input_path)
     urls = [u["url"] for u in urls_with_offset]
     
@@ -504,7 +477,7 @@ def lib_upload_step(message):
     for i, url in enumerate(urls[:10]):
         offset = urls_with_offset[i]["offset"]
         length = urls_with_offset[i]["length"]
-        markup.add(types.InlineKeyboardButton(f"🔗 {url[:25]}... (offset:{offset} len:{length})", callback_data=f"edit_{i}"))
+        markup.add(types.InlineKeyboardButton(f"🔗 {url[:25]}... (off:{offset} len:{length})", callback_data=f"edit_{i}"))
     markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel"))
     
     url_list = "\n".join([f"`{i+1}. {url}`\n   Offset: {urls_with_offset[i]['offset']} | Length: {urls_with_offset[i]['length']}" for i, url in enumerate(urls[:10])])
@@ -778,7 +751,7 @@ def handle_callback(call):
             "📋 **Commands**\n/lib — Lib editor with offset+length\n/protect — Elite protection\n/encrypt — Encrypt\n/decrypt — Decrypt\n/frida — Frida patch\n/behavior — Frida script\n/fixlogin — Fix login\n👑 @VICKYGAMING0")
     elif call.data == "dev":
         bot.send_message(call.message.chat.id,
-            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 10.0\n🔹 Features: Offset + Length URL replace")
+            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 11.0\n🔹 Features: Offset + Length exact replace")
     elif call.data == "stats":
         db = load_db()
         bot.send_message(call.message.chat.id,
@@ -821,7 +794,7 @@ def process_url_edit(message):
         return
     input_path = session["input_path"]
     
-    success, result = replace_url_with_offset(input_path, old_url, new_url)
+    success, result = replace_url_exact(input_path, old_url, new_url)
     if success:
         temp_dir = session["temp_dir"]
         file_name = session["file_name"]
@@ -840,7 +813,7 @@ def process_url_edit(message):
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
-    print("🛡️ Ultimate Lib Editor v10.0 Started!")
+    print("🛡️ Ultimate Lib Editor v11.0 Started!")
     print(f"👑 Developer: @{ADMIN_USERNAME}")
     while True:
         try:
