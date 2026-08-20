@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Ultimate Lib Editor v11.0 (FINAL FIX)
+# Ultimate Lib Editor v12.0 (HEX EDITOR + AUTO OFFSET/LENGTH)
 # Developer: @VICKYGAMING0
 
 import telebot
@@ -59,7 +59,47 @@ def increment_processed(user_id):
         db[str(user_id)]["files_processed"] += 1
         save_db(db)
 
-# ===================== OFFSET + LENGTH URL EXTRACTOR =====================
+# ===================== HEX EDITOR — AUTO OFFSET + LENGTH =====================
+def hex_replace_url(file_path, old_url, new_url):
+    """
+    Hex-level replace with auto offset + length detection
+    - Finds exact offset of old_url
+    - Adjusts new_url to match old length (pad with null or truncate)
+    - Replaces at exact byte position
+    """
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+        
+        old_bytes = old_url.encode('utf-8')
+        new_bytes = new_url.encode('utf-8')
+        old_len = len(old_bytes)
+        new_len = len(new_bytes)
+        
+        # Find exact offset
+        offset = data.find(old_bytes)
+        if offset == -1:
+            return False, "URL not found in binary"
+        
+        # Auto-adjust length
+        if new_len < old_len:
+            # Pad with null bytes
+            new_bytes = new_bytes + b'\x00' * (old_len - new_len)
+        elif new_len > old_len:
+            # Truncate to old length (safe)
+            new_bytes = new_bytes[:old_len]
+        
+        # Replace at exact offset
+        new_data = data[:offset] + new_bytes + data[offset + old_len:]
+        
+        with open(file_path, "wb") as f:
+            f.write(new_data)
+        
+        return True, f"Offset: {offset} | Old Len: {old_len} | New Len: {len(new_bytes)}"
+    except Exception as e:
+        return False, str(e)
+
+# ===================== URL EXTRACTOR (WITH OFFSET + LENGTH) =====================
 def extract_urls_with_offset(file_path):
     """Extract URLs with their exact offset and length"""
     urls_with_offset = []
@@ -82,40 +122,6 @@ def extract_urls_with_offset(file_path):
         return urls_with_offset
     except:
         return []
-
-# ===================== EXACT REPLACE WITH OFFSET + LENGTH =====================
-def replace_url_exact(file_path, old_url, new_url):
-    """Replace URL at exact offset with proper length (pad if shorter)"""
-    try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-        
-        old_bytes = old_url.encode('utf-8')
-        new_bytes = new_url.encode('utf-8')
-        old_len = len(old_bytes)
-        new_len = len(new_bytes)
-        
-        # Find exact offset
-        offset = data.find(old_bytes)
-        if offset == -1:
-            return False, "URL not found"
-        
-        # If new URL is shorter, pad with null bytes
-        if new_len < old_len:
-            new_bytes = new_bytes + b'\x00' * (old_len - new_len)
-        elif new_len > old_len:
-            # If longer, pad with null bytes (keep same length)
-            new_bytes = new_bytes[:old_len]
-        
-        # Replace at exact offset
-        new_data = data[:offset] + new_bytes + data[offset + old_len:]
-        
-        with open(file_path, "wb") as f:
-            f.write(new_data)
-        
-        return True, f"Offset: {offset}, Old Len: {old_len}, New Len: {len(new_bytes)}"
-    except Exception as e:
-        return False, str(e)
 
 # ===================== REPACK =====================
 def repack_file(input_path, output_path):
@@ -423,10 +429,10 @@ def start(message):
     
     bot.send_message(
         message.chat.id,
-        f"🛡️ **Ultimate Lib Editor v11.0**\n\n"
+        f"🛡️ **Ultimate Lib Editor v12.0 (HEX EDITOR)**\n\n"
         f"👑 Developer: @{ADMIN_USERNAME}\n\n"
         f"📌 **Features:**\n"
-        f"📤 Lib Editor — Extract & replace URLs with OFFSET + LENGTH (EXACT)\n"
+        f"📤 Lib Editor — HEX-level replace with AUTO OFFSET + LENGTH\n"
         f"🛡️ Elite Protect — 360 + Chinese + Hide Classes\n"
         f"🔐 Encrypt — Real AES-256\n"
         f"🔓 Decrypt — Real AES-256\n"
@@ -437,10 +443,10 @@ def start(message):
         reply_markup=markup
     )
 
-# ===================== LIB EDITOR (WITH OFFSET + LENGTH) =====================
+# ===================== LIB EDITOR (HEX EDITOR) =====================
 @bot.message_handler(commands=['lib'])
 def lib_cmd(message):
-    msg = bot.reply_to(message, "📤 Upload a `.so` / `.dll` / `.apk` file.\n🔹 I'll extract URLs with OFFSET + LENGTH.")
+    msg = bot.reply_to(message, "📤 Upload a `.so` / `.dll` / `.apk` file.\n🔹 HEX-level replace with AUTO offset + length.")
     bot.register_next_step_handler(msg, lib_upload_step)
 
 def lib_upload_step(message):
@@ -748,10 +754,10 @@ def handle_callback(call):
         fixlogin_cmd(call.message)
     elif call.data == "help":
         bot.send_message(call.message.chat.id,
-            "📋 **Commands**\n/lib — Lib editor with offset+length\n/protect — Elite protection\n/encrypt — Encrypt\n/decrypt — Decrypt\n/frida — Frida patch\n/behavior — Frida script\n/fixlogin — Fix login\n👑 @VICKYGAMING0")
+            "📋 **Commands**\n/lib — HEX editor with auto offset+length\n/protect — Elite protection\n/encrypt — Encrypt\n/decrypt — Decrypt\n/frida — Frida patch\n/behavior — Frida script\n/fixlogin — Fix login\n👑 @VICKYGAMING0")
     elif call.data == "dev":
         bot.send_message(call.message.chat.id,
-            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 11.0\n🔹 Features: Offset + Length exact replace")
+            "👑 **Developer**\n🔹 Name: Vicky Gaming\n🔹 @VICKYGAMING0\n🔹 Version: 12.0\n🔹 Features: HEX Editor + Auto Offset/Length")
     elif call.data == "stats":
         db = load_db()
         bot.send_message(call.message.chat.id,
@@ -794,7 +800,8 @@ def process_url_edit(message):
         return
     input_path = session["input_path"]
     
-    success, result = replace_url_exact(input_path, old_url, new_url)
+    # Use HEX editor for replace
+    success, result = hex_replace_url(input_path, old_url, new_url)
     if success:
         temp_dir = session["temp_dir"]
         file_name = session["file_name"]
@@ -813,7 +820,7 @@ def process_url_edit(message):
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
-    print("🛡️ Ultimate Lib Editor v11.0 Started!")
+    print("🛡️ Ultimate Lib Editor v12.0 (HEX EDITOR) Started!")
     print(f"👑 Developer: @{ADMIN_USERNAME}")
     while True:
         try:
